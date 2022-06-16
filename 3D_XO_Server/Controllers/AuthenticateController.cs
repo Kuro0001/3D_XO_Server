@@ -18,7 +18,6 @@ namespace _3D_XO_Server.Controllers
     [ApiController]
     public class AuthenticateController : ControllerBase
     {
-        private readonly IdentityDbContext _context;
         private readonly UserManager<ApplicationUser> userManager;
         private readonly RoleManager<IdentityRole> roleManager;
         private readonly IConfiguration _configuration;
@@ -49,11 +48,22 @@ namespace _3D_XO_Server.Controllers
         }
 
         [HttpGet("get-user-by-username/{username}")]
-        [Authorize(Roles = Authentication.UserRoles.Admin)]
+        [Authorize]
         public async Task<ApplicationUser> GetUser(string username)
         {
             ApplicationUser user = await userManager.FindByNameAsync(username);
             return user;
+        }
+
+        [HttpPut("set-violation/{username}")]
+        [Authorize]
+        public async void SetViolation(string username)
+        {
+            ApplicationUser user = await userManager.FindByNameAsync(username);
+            user.Violation++;
+            if (user.Violation >= 10)
+                user.IsActive = false;
+            await userManager.UpdateAsync(user);
         }
 
         [HttpPost]
@@ -100,6 +110,52 @@ namespace _3D_XO_Server.Controllers
             return Unauthorized();
         }
 
+        [HttpPost]
+        [Route("login-in-game")]
+        public async Task<IActionResult> LoginInGame(LoginModel model)
+        {
+            var user = await userManager.FindByNameAsync(model.Username);
+            if (user != null && await userManager.CheckPasswordAsync(user, model.Password))
+            {
+                if (user.IsActive == true)
+                {
+                    var userRoles = await userManager.GetRolesAsync(user);
+
+                    var authClaims = new List<Claim>
+                {
+                    new Claim(ClaimTypes.Name, user.UserName),
+                    new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+                };
+
+                    foreach (var userRole in userRoles)
+                    {
+                        authClaims.Add(new Claim(ClaimTypes.Role, userRole));
+                    }
+
+                    var authSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["JWT:Secret"]));
+
+                    var token = new JwtSecurityToken(
+                        issuer: _configuration["JWT:ValidIssuer"],
+                        audience: _configuration["JWT:ValidAudience"],
+                        expires: DateTime.Now.AddHours(3),
+                        claims: authClaims,
+                        signingCredentials: new SigningCredentials(authSigningKey, SecurityAlgorithms.HmacSha256)
+                        );
+
+                    return Ok(new
+                    {
+                        token = new JwtSecurityTokenHandler().WriteToken(token),
+                        expiration = token.ValidTo,
+                        idUser = user.Id
+
+                    });
+                }
+                else
+                    return NoContent();
+            }
+            return Unauthorized();
+        }
+
         [HttpPut("set-user/{username}&{isactive}")]
         [Authorize(Roles = Authentication.UserRoles.Admin)]
         public async Task<IActionResult> Put(string username, bool isactive)
@@ -124,7 +180,7 @@ namespace _3D_XO_Server.Controllers
         {
             var userExists = await userManager.FindByNameAsync(model.Username);
             if (userExists != null)
-                return StatusCode(StatusCodes.Status500InternalServerError, new ResponseModel { Status = "Error", Message = "User already exists!" });
+                return Ok(new ResponseModel { Status = "Error", Message = "User already exists!" });
 
             ApplicationUser user = new ApplicationUser()
             {
@@ -135,7 +191,7 @@ namespace _3D_XO_Server.Controllers
             };
             var result = await userManager.CreateAsync(user, model.Password);
             if (!result.Succeeded)
-                return StatusCode(StatusCodes.Status500InternalServerError, new ResponseModel { Status = "Error", Message = "User creation failed! Please check user details and try again." });
+                return Ok(new ResponseModel { Status = "Error", Message = "User creation failed! Please check user details and try again." });
 
             return Ok(new ResponseModel { Status = "Success", Message = "User created successfully!" });
         }

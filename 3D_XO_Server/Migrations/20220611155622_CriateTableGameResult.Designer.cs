@@ -3,15 +3,17 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using _3D_XO_Server.Models;
 
 namespace _3D_XO_Server.Migrations
 {
     [DbContext(typeof(DBContext))]
-    partial class DBContextModelSnapshot : ModelSnapshot
+    [Migration("20220611155622_CriateTableGameResult")]
+    partial class CriateTableGameResult
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -29,8 +31,11 @@ namespace _3D_XO_Server.Migrations
                     b.Property<DateTime>("Date")
                         .HasColumnType("datetime2");
 
-                    b.Property<int?>("ResultId")
+                    b.Property<int?>("GameResultId")
                         .HasColumnType("int");
+
+                    b.Property<string>("Result")
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("User1Id")
                         .HasColumnType("nvarchar(max)");
@@ -40,7 +45,7 @@ namespace _3D_XO_Server.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ResultId");
+                    b.HasIndex("GameResultId");
 
                     b.ToTable("Games");
                 });
@@ -130,9 +135,9 @@ namespace _3D_XO_Server.Migrations
 
             modelBuilder.Entity("_3D_XO_Server.Models.Game", b =>
                 {
-                    b.HasOne("_3D_XO_Server.Models.GameResult", "Result")
+                    b.HasOne("_3D_XO_Server.Models.GameResult", null)
                         .WithMany("Games")
-                        .HasForeignKey("ResultId");
+                        .HasForeignKey("GameResultId");
                 });
 
             modelBuilder.Entity("_3D_XO_Server.Models.GamesState", b =>
